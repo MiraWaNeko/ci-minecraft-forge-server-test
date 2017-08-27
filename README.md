@@ -76,7 +76,7 @@ getVersions()
     .then(() => {
         tester
             .setVersions(minecraftVersion, forgeVersion) // Set versions
-            .acceptEULA()                                // Accept Minecraft's EULA
+            //.acceptEULA()                              // Accept Minecraft's EULA (commented out to prevent blindingly accepting by copy/paste)
             .useServerProperties()                       // Use ci-minecraft-forge-server-test's server.properties file
             .setServerDirectory(serverDirectory)         // Set the directory for the server
             .addLocalMod(modFilepath)                    // Add the mod
