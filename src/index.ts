@@ -261,8 +261,8 @@ export class CIMinecraftForgeServerTest {
             throw new Error(`You haven't accepted Minecraft's EULA!`);
         }
 
-        return Promise.resolve
-            (() => this.writeServerProperties())
+        return Promise.resolve()
+            .then(() => this.writeServerProperties())
             .then(() => this.writeEula())
             .then(() => this.removeOldData())
             .then(() => this.copyMods())
@@ -389,7 +389,7 @@ export class CIMinecraftForgeServerTest {
 
     private writeServerProperties() {
         if (!this.usingServerProperties) {
-            return Promise.resolve();
+            return;
         }
 
         return new Promise
