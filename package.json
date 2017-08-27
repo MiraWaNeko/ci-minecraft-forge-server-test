@@ -1,0 +1,28 @@
+{
+  "name": "ci-minecraft-forge-server-test",
+  "description": "Minecraft Forge server testing for CI",
+  "author": {
+    "name": "Chikachi",
+    "email": "chikachi@chikachi.net"
+  },
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start-dev": "tsc & node dist/index.js"
+  },
+  "dependencies": {
+    "rimraf": "^2.6.1",
+    "semver": "^5.4.1",
+    "source-map-support": "^0.4.16"
+  },
+  "devDependencies": {
+    "@types/node": "^8.0.24",
+    "@types/semver": "^5.3.34",
+    "tslint": "^5.6.0",
+    "tslint-microsoft-contrib": "^5.0.1",
+    "typescript": "^2.4.2"
+  },
+  "private": true
+}
