@@ -36,7 +36,7 @@ pipeline {
     stage('Run Server Test') {
       steps {
         dir('serverTest') {
-          sh 'npm install'
+          sh 'npm update'
           sh 'npm start'
         }
       }
