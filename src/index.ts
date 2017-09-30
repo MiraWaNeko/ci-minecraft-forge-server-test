@@ -53,6 +53,7 @@ export class CIMinecraftForgeServerTest {
 
     private mods: string[] = [];
     private commands: string[] = [];
+    private delayBeforeCommands: number = 1e2;
     private delayBetweenCommands: number = 1e2;
     private maxStartupTime: number = 3e4;
 
@@ -137,6 +138,14 @@ export class CIMinecraftForgeServerTest {
      */
     public setCommands(commands: string[]) {
         this.commands = commands;
+    }
+
+    /**
+     * Set the delay between server reporting Done starting and first command being executed
+     * @param delay Milliseconds
+     */
+    public setDelayBeforeCommands(delay: number) {
+        this.delayBeforeCommands = delay;
     }
 
     /**
@@ -352,7 +361,12 @@ export class CIMinecraftForgeServerTest {
                     if (data.toString().split(': Done (').length > 1) {
                         errored = false;
                         clearTimeout(this.minecraftServerTimeout);
-                        this.executeNextCommand();
+                        setTimeout(
+                            () => {
+                                this.executeNextCommand();
+                            },
+                            this.delayBeforeCommands,
+                        );
                     }
                     if (data.toString().split('Fatal errors were detected during the transition').length > 1) {
                         errored = true;
