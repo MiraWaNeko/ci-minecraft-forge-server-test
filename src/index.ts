@@ -35,6 +35,11 @@ export type CurseForgeDependencyInfo = {
     fileid: string;
 };
 
+export type ConfigCopyInfo = {
+    filepath: string;
+    relativeDestination?: string[];
+};
+
 export class CIMinecraftForgeServerTest {
     private serverDirectory = join('.', 'run');
     private tmpDirectory = join('.', 'tmp');
@@ -52,6 +57,7 @@ export class CIMinecraftForgeServerTest {
     private usingServerProperties: boolean = false;
 
     private mods: string[] = [];
+    private configs: ConfigCopyInfo[] = [];
     private commands: string[] = [];
     private delayBeforeCommands: number = 1e2;
     private delayBetweenCommands: number = 1e2;
@@ -125,11 +131,26 @@ export class CIMinecraftForgeServerTest {
     }
 
     /**
+     * Download and add a mod from CurseForge
+     * @param modInfo Informations about the mod.
+     */
+    public addConfigFile(filepath: string, relativeDestination?: string[]) {
+        this.configs.push({
+            filepath,
+            relativeDestination,
+        });
+
+        return this;
+    }
+
+    /**
      * Add command to list of commands to be executed
      * @param commands Command to be added
      */
     public addCommand(command: string) {
         this.commands.push(command);
+
+        return this;
     }
 
     /**
@@ -138,6 +159,8 @@ export class CIMinecraftForgeServerTest {
      */
     public setCommands(commands: string[]) {
         this.commands = commands;
+
+        return this;
     }
 
     /**
@@ -146,6 +169,8 @@ export class CIMinecraftForgeServerTest {
      */
     public setDelayBeforeCommands(delay: number) {
         this.delayBeforeCommands = delay;
+
+        return this;
     }
 
     /**
@@ -154,6 +179,8 @@ export class CIMinecraftForgeServerTest {
      */
     public setDelayBetweenCommands(delay: number) {
         this.delayBetweenCommands = delay;
+
+        return this;
     }
 
     /**
@@ -162,6 +189,8 @@ export class CIMinecraftForgeServerTest {
      */
     public setMaxStartupTime(time: number) {
         this.maxStartupTime = time;
+
+        return this;
     }
 
     /**
@@ -274,6 +303,7 @@ export class CIMinecraftForgeServerTest {
             .then(() => this.writeServerProperties())
             .then(() => this.writeEula())
             .then(() => this.removeOldData())
+            .then(() => this.copyConfigs())
             .then(() => this.copyMods())
             .then(() => this.startServer());
     }
@@ -455,32 +485,59 @@ generate-structures=false`,
                 const copyPromises = [];
 
                 for (const modPath of this.mods) {
-                    copyPromises.push(this.copyMod(modPath, join(this.serverDirectory, 'mods', basename(modPath))));
+                    copyPromises.push(this.copyFile(modPath, join(this.serverDirectory, 'mods', basename(modPath))));
                 }
 
                 return Promise.all(copyPromises);
             });
     }
 
-    private copyMod(fromPath, toPath) {
+    private copyConfigs() {
+        return this.ensureFolderExists(join(this.serverDirectory, 'config'))
+            .then(async () => {
+                const copyPromises = [];
+
+                for (const config of this.configs) {
+                    let destination = join(
+                        this.serverDirectory,
+                        'config',
+                    );
+
+                    if (config.relativeDestination != null) {
+                        for (const destinationPart of config.relativeDestination) {
+                            destination = join(destination, destinationPart);
+                            await this.ensureFolderExists(destination);
+                        }
+                    }
+
+                    destination = join(destination, basename(config.filepath));
+
+                    copyPromises.push(this.copyFile(config.filepath, destination));
+                }
+
+                return Promise.all(copyPromises);
+            });
+    }
+
+    private copyFile(fromPath, toPath) {
         return new Promise((resolve, reject) => {
             let errored = false;
-            const modReadStream = createReadStream(fromPath);
-            modReadStream.on('error', () => {
+            const readStream = createReadStream(fromPath);
+            readStream.on('error', () => {
                 errored = true;
-                reject(`Could not read mod file : ${basename(fromPath)}`);
+                reject(`Could not read file : ${basename(fromPath)}`);
             });
-            const modWriteStream = createWriteStream(toPath);
-            modReadStream.on('error', () => {
+            const writeStream = createWriteStream(toPath);
+            readStream.on('error', () => {
                 errored = true;
-                reject(`Could not write mod file : ${basename(fromPath)}`);
+                reject(`Could not write file : ${basename(fromPath)}`);
             });
-            modWriteStream.on('close', () => {
+            writeStream.on('close', () => {
                 if (!errored) {
                     resolve();
                 }
             });
-            modReadStream.pipe(modWriteStream);
+            readStream.pipe(writeStream);
         });
     }
 }

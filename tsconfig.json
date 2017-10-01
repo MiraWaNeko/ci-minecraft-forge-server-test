@@ -9,6 +9,7 @@
     "outDir": "dist",
     "sourceMap": true,
     "pretty": true,
+    "declaration": true,
     "typeRoots": [
       "node_modules/@types"
     ],
