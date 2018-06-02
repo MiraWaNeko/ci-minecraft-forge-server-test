@@ -28,6 +28,8 @@ import { exit } from 'process';
 import * as rimraf from 'rimraf';
 import { lte, minor, patch } from 'semver';
 
+import { CommandStep, IStep } from './step';
+
 export type CurseForgeDependencyInfo = {
     module: string;
     version: string;
@@ -56,12 +58,14 @@ export class CIMinecraftForgeServerTest {
     private eulaAccepted: boolean = false;
     private usingServerProperties: boolean = false;
 
+    private javaPath: string = 'java';
+
     private mods: string[] = [];
     private configs: ConfigCopyInfo[] = [];
-    private commands: string[] = [];
-    private delayBeforeCommands: number = 1e2;
-    private delayBetweenCommands: number = 1e2;
-    private maxStartupTime: number = 3e4;
+    private steps: IStep[] = [];
+    private delayBeforeSteps: number = 1e2;
+    private delayBetweenSteps: number = 1e2;
+    private maxStartupTime: number = 3e5;
 
     private minecraftServer = null;
     private minecraftServerTimeout = null;
@@ -112,6 +116,17 @@ export class CIMinecraftForgeServerTest {
     }
 
     /**
+     * Set the path to the java executable
+     * Defaults to execute "java"
+     * @param path Path to java executable
+     */
+    public setJavaPath(javaPath: string) {
+        this.javaPath = javaPath;
+
+        return this;
+    }
+
+    /**
      * Add a mod from local file
      * @param filepath Path to mod file
      */
@@ -131,8 +146,9 @@ export class CIMinecraftForgeServerTest {
     }
 
     /**
-     * Download and add a mod from CurseForge
-     * @param modInfo Informations about the mod.
+     * Add config file from local file
+     * @param filepath Path to config file.
+     * @param relativeDestination Relative destination path from the configs folder.
      */
     public addConfigFile(filepath: string, relativeDestination?: string[]) {
         this.configs.push({
@@ -144,21 +160,21 @@ export class CIMinecraftForgeServerTest {
     }
 
     /**
-     * Add command to list of commands to be executed
+     * Add command step to list of steps to be executed
      * @param commands Command to be added
      */
     public addCommand(command: string) {
-        this.commands.push(command);
+        this.steps.push(new CommandStep(command));
 
         return this;
     }
 
     /**
-     * Set the commands to be executed
-     * @param commands Array of commands
+     * Add step to list of steps to be executed
+     * @param step Step to be added
      */
-    public setCommands(commands: string[]) {
-        this.commands = commands;
+    public addStep(step: IStep) {
+        this.steps.push(step);
 
         return this;
     }
@@ -168,7 +184,7 @@ export class CIMinecraftForgeServerTest {
      * @param delay Milliseconds
      */
     public setDelayBeforeCommands(delay: number) {
-        this.delayBeforeCommands = delay;
+        this.delayBeforeSteps = delay;
 
         return this;
     }
@@ -178,7 +194,7 @@ export class CIMinecraftForgeServerTest {
      * @param delay Milliseconds
      */
     public setDelayBetweenCommands(delay: number) {
-        this.delayBetweenCommands = delay;
+        this.delayBetweenSteps = delay;
 
         return this;
     }
@@ -237,7 +253,7 @@ export class CIMinecraftForgeServerTest {
                 return new Promise((resolve, reject) => {
                     // Installing Forge
                     const installer = spawn(
-                        'java',
+                        this.javaPath,
                         [
                             '-jar',
                             this.forgeInstallerFilename,
@@ -364,7 +380,7 @@ export class CIMinecraftForgeServerTest {
         return new Promise
             ((resolve, reject) => {
                 this.minecraftServer = spawn(
-                    'java',
+                    this.javaPath,
                     [
                         '-jar',
                         this.forgeUniversalFilename,
@@ -393,14 +409,19 @@ export class CIMinecraftForgeServerTest {
                         clearTimeout(this.minecraftServerTimeout);
                         setTimeout(
                             () => {
-                                this.executeNextCommand();
+                                this.executeNextStep();
                             },
-                            this.delayBeforeCommands,
+                            this.delayBeforeSteps,
                         );
                     }
                     if (data.toString().split('Fatal errors were detected during the transition').length > 1) {
                         errored = true;
                     }
+                });
+
+                this.minecraftServer.stderr.on('data', data => {
+                    // tslint:disable-next-line:no-console
+                    console.error(data.toString().trim());
                 });
 
                 this.minecraftServer.on('close', code => {
@@ -413,21 +434,24 @@ export class CIMinecraftForgeServerTest {
             });
     }
 
-    private executeNextCommand() {
+    private executeNextStep() {
         setTimeout(
             () => {
-                if (this.commands.length === 0) {
-                    // Stop the server as all commands have been executed
+                if (this.steps.length === 0) {
+                    // Stop the server as all steps have been executed
                     this.minecraftServer.stdin.write('stop\n');
 
                     return;
                 }
 
-                const command = this.commands.shift();
-                this.minecraftServer.stdin.write(`${command}\n`);
-                this.executeNextCommand();
+                this.steps
+                    .shift()
+                    .execute(this.minecraftServer)
+                    .then(() => {
+                        this.executeNextStep();
+                    });
             },
-            this.delayBetweenCommands,
+            this.delayBetweenSteps,
         );
     }
 
